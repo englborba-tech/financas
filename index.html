@@ -48,7 +48,7 @@ label.ck{display:flex;align-items:center;gap:8px;color:var(--mut)}label.ck input
 .bar .t i.x{background:var(--no)}.bar .t i.w{background:var(--wa)}
 .st{color:var(--mut);font-size:.85rem;text-align:center;margin:6px 0}
 .tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--bd);padding-bottom:env(safe-area-inset-bottom,0px)}
-.tabs button{flex:1;border:0;border-radius:0;background:none;padding:12px 4px;color:var(--mut);font-size:.9rem}
+.tabs button{font-size:.78rem!important;padding:10px 2px!important;flex:1;border:0;border-radius:0;background:none;padding:12px 4px;color:var(--mut);font-size:.9rem}
 .tabs button.on{color:var(--ac);font-weight:700}
 .pg{display:none}.pg.on{display:block}
 .div{font-size:1rem;text-align:center;padding:4px 0}
@@ -69,6 +69,7 @@ button.dan{background:var(--no);border-color:var(--no);color:#fff;font-weight:60
 .mesH{padding:8px 0 4px;margin-top:6px}.mesH b{text-transform:capitalize}.mesH small{color:var(--mut);display:block}
 .dia{font-size:.8rem;color:var(--mut);margin:10px 0 0;font-weight:600}
 input.busca{margin-bottom:8px}
+.sec2{font-size:.78rem;font-weight:700;color:var(--mut);text-transform:uppercase;margin:14px 0 4px}
 </style>
 </head>
 <body>
@@ -85,7 +86,8 @@ input.busca{margin-bottom:8px}
       <div class="leg"><span><i style="background:var(--ok)"></i>Receitas</span><span><i style="background:var(--no)"></i>Despesas</span></div></div>
     <div class="card"><h2>Despesas por grupo</h2><div id="grupos"></div></div>
     <div class="card"><h2>Maiores gastos do mês</h2><ul class="lista" id="top"></ul></div>
-    <div class="card"><h2>Por pessoa</h2><div id="pessoas"></div></div>
+    <div class="card"><h2>Saldo por pessoa</h2><div id="pessoas"></div></div>
+    <div class="card"><h2>Despesas por forma de pagamento</h2><div id="pagsR"></div></div>
   </section>
 
   <!-- MÊS -->
@@ -102,7 +104,8 @@ input.busca{margin-bottom:8px}
         <input id="desc" placeholder="Descrição (ex.: Mercado)" maxlength="80" required>
         <div class="row"><input id="valor" inputmode="decimal" placeholder="Valor total (R$)" required><input id="data" type="date" required></div>
         <select id="cat"></select>
-        <div class="seg" id="sQuem"><button type="button" data-v="Conjunto" class="on">Casa</button><button type="button" data-v="Lucas">Lucas</button><button type="button" data-v="Ana">Ana</button></div>
+        <div class="seg" id="sQuem"><button type="button" data-v="Lucas" class="on">Lucas</button><button type="button" data-v="Ana">Ana</button></div>
+        <select id="pag"></select>
                 <div class="row" id="rowParc"><select id="parc"></select><span class="st" style="align-self:center;margin:0">Parcelas (1ª na data)</span></div>
         <button class="pri" type="submit">Adicionar</button>
       </form>
@@ -117,6 +120,11 @@ input.busca{margin-bottom:8px}
       <div id="hist"></div></div>
   </section>
 
+  <!-- PESSOAS -->
+  <section class="pg" id="pg-pes">
+    <div id="pesBox"></div>
+  </section>
+
   <!-- FIXAS -->
   <section class="pg" id="pg-fixas">
     <div class="card">
@@ -127,7 +135,8 @@ input.busca{margin-bottom:8px}
         <input id="fDesc" placeholder="Descrição (ex.: Aluguel, Internet)" maxlength="80" required>
         <div class="row"><input id="fValor" inputmode="decimal" placeholder="Valor mensal (R$)" required><input id="fDia" type="number" min="1" max="31" placeholder="Dia do vencimento" required></div>
         <select id="fCat"></select>
-        <div class="seg" id="fQuem"><button type="button" data-v="Conjunto" class="on">Casa</button><button type="button" data-v="Lucas">Lucas</button><button type="button" data-v="Ana">Ana</button></div>
+        <div class="seg" id="fQuem"><button type="button" data-v="Lucas" class="on">Lucas</button><button type="button" data-v="Ana">Ana</button></div>
+        <select id="fPag"></select>
                 <button class="pri" type="submit">Adicionar conta fixa</button>
       </form>
     </div>
@@ -149,7 +158,7 @@ input.busca{margin-bottom:8px}
   <p style="font-size:2.5rem;margin:0">💰</p><p><b>Finanças da Casa</b><br><span style="color:var(--mut)">Entre com sua conta Google para acessar.</span></p>
   <button id="entrar" class="pri" type="button" style="width:100%">Entrar com Google</button></div></div>
 <nav class="tabs">
-  <button data-p="dash" class="on">📊 Resumo</button><button data-p="mes">➕ Lançar</button><button data-p="hist">🗂️ Meses</button><button data-p="fixas">🔁 Fixas</button><button data-p="metas">🎯 Metas</button>
+  <button data-p="dash" class="on">📊 Resumo</button><button data-p="mes">➕ Lançar</button><button data-p="hist">🗂️ Meses</button><button data-p="pes">👥 Pessoas</button><button data-p="fixas">🔁 Fixas</button><button data-p="metas">🎯 Metas</button>
 </nav>
 
 <script>
@@ -164,6 +173,8 @@ const GRUPOS={
  "Financeiro":["Impostos/Taxas","Tarifas bancárias","Poupança/Investimento"],
  "Outros":["Outros"]};
 const RECEITAS=["Salário","Pró-labore/Serviços","Rendimentos","Outras receitas"];
+const PAGS=["Pix","Cartão de crédito","Cartão de débito","Dinheiro","Transferência (TED/DOC)","Boleto","Débito automático","Vale-alimentação/refeição","Outro"];
+const PESSOAS=["Lucas","Ana"];
 const grupoDe=c=>{for(const g in GRUPOS)if(GRUPOS[g].includes(c))return g;return "Outros";};
 const CATS={d:Object.values(GRUPOS).flat(),r:RECEITAS};
 const $=id=>document.getElementById(id);
@@ -188,7 +199,7 @@ $("parc").innerHTML=Array.from({length:48},(_,i)=>`<option value="${i+1}">${i+1=
 function seg(id,cb){const box=$(id);box.querySelectorAll("button").forEach(b=>b.onclick=()=>{box.querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b));cb&&cb(b.dataset.v);});}
 const val=id=>$(id).querySelector("button.on").dataset.v;
 function fill(sel,t){$(sel).innerHTML=t==="r"?RECEITAS.map(c=>`<option>${c}</option>`).join(""):Object.entries(GRUPOS).map(([g,cs])=>`<optgroup label="${g}">${cs.map(c=>`<option>${c}</option>`).join("")}</optgroup>`).join("");}
-fill("cat","d");fill("fCat","d");
+fill("cat","d");fill("fCat","d");["pag","fPag"].forEach(id=>{$(id).innerHTML=PAGS.map(p=>`<option>${p}</option>`).join("");});
 seg("sTipo",t=>{fill("cat",t);$("rowParc").style.display=t==="d"?"":"none";});
 seg("fTipo",t=>fill("fCat",t));seg("sQuem");seg("fQuem");
 document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{
@@ -230,7 +241,7 @@ function render(){
   if(!fx.length)uf.append(el("p","st","Nenhuma conta fixa ativa."));
   fx.forEach(f=>{
     const li=el("li"),inf=el("div","inf");
-    inf.append(el("div",null,f.desc),el("small",null,"Todo dia "+f.dia+" · "+f.cat+" · "+nomeQ(f.quem)+" · desde "+f.inicio.split("-").reverse().join("/")));
+    inf.append(el("div",null,f.desc),el("small",null,"Todo dia "+f.dia+" · "+f.cat+" · "+nomeQ(f.quem)+(f.pag?" · "+f.pag:"")+" · desde "+f.inicio.split("-").reverse().join("/")));
     const del=el("button","del","Encerrar");del.onclick=async()=>{
       if(!await ask(`Encerrar "${f.desc}"? Ela deixa de aparecer a partir de ${ref.toLocaleDateString("pt-BR",{month:"long",year:"numeric"})}; os meses anteriores ficam.`,[["Encerrar",true,"dan"],["Cancelar",false]]))return;
       try{ if(addMes(m,-1)<f.inicio)await db.collection("fixas").doc(f.id).delete();
@@ -260,7 +271,7 @@ function linha(x){
   const li=el("li"),inf=el("div","inf"),d1=el("div",null,x.desc);
   if(x.fixa)d1.append(el("span","tag","fixa"));
   if(x.parcela)d1.append(el("span","tag",x.parcela.n+"/"+x.parcela.total));
-  inf.append(d1,el("small",null,x.data.split("-").reverse().join("/")+" · "+x.cat+" · "+nomeQ(x.quem)));
+  inf.append(d1,el("small",null,x.data.split("-").reverse().join("/")+" · "+x.cat+" · "+nomeQ(x.quem)+(x.pag?" · "+x.pag:"")));
   li.append(inf,el("b",x.tipo==="r"?"ok":"no",(x.tipo==="r"?"+ ":"− ")+brl(x.valor)));
   if(!x.fixa){const del=el("button","del","✕");del.type="button";del.setAttribute("aria-label","Excluir");del.onclick=()=>excluir(x);li.append(del);}
   return li;
@@ -287,9 +298,45 @@ function renderHist(){
   if(!achou)h.append(el("p","st","Nada encontrado."));
 }
 $("busca").oninput=e=>{busca=e.target.value.trim();renderHist();};
-const nomeQ=q=>q==="Lucas"||q==="Ana"?q:"Casa";
+const nomeQ=q=>q==="Lucas"||q==="Ana"?q:"Sem pessoa";
 function barra(box,nome,v,tot,extra){const b=el("div","bar"),l=el("div","l");l.append(el("span",null,nome),el("span",null,brl(v)+(extra||"")));
   const t=el("div","t"),i=el("i");i.style.width=(tot?v/tot*100:0).toFixed(1)+"%";t.append(i);b.append(l,t);box.append(b);}
+function totaisPessoa(itens,q){let R=0,D=0;itens.forEach(x=>{if(x.quem!==q)return;x.tipo==="r"?R+=x.valor:D+=x.valor;});return{R,D};}
+function renderPessoas(m,itens,R,D){
+  const box=$("pesBox");if(!box)return;box.innerHTML="";
+  const card=(...k)=>{const c=el("div","card");c.append(...k);box.append(c);return c;};
+  // casal
+  const saldo=R-D,cs=el("div","card");
+  cs.append(el("h2",null,"Casal no mês"));
+  const k=el("div","kpi");[["Receita do casal",brl(R),"ok"],["Despesas do casal",brl(D),"no"],[saldo>=0?"Sobrou":"Faltou",brl(Math.abs(saldo)),saldo>=0?"ok":"no"]]
+    .forEach(([a,b,c])=>{const d=el("div");d.append(el("small",null,a),el("b",c,b));k.append(d);});cs.append(k);box.append(cs);
+  // individual
+  PESSOAS.forEach(q=>{
+    const t=totaisPessoa(itens,q),sd=t.R-t.D,c=el("div","card");
+    c.append(el("h2",null,q));
+    const k=el("div","kpi");[["Recebeu",brl(t.R),"ok"],["Gastou",brl(t.D),"no"],["Saldo",brl(sd),sd>=0?"ok":"no"]]
+      .forEach(([a,b,cl])=>{const d=el("div");d.append(el("small",null,a),el("b",cl,b));k.append(d);});c.append(k);
+    if(sd<0)c.append(el("p","st",`⚠ Gastou ${brl(-sd)} a mais do que recebeu neste mês.`));
+    const rec=itens.filter(x=>x.quem===q&&x.tipo==="r");
+    if(rec.length){c.append(el("div","sec2","Receitas"));const ul=el("ul","lista");rec.forEach(x=>ul.append(linha(x)));c.append(ul);}
+    const pc={};itens.filter(x=>x.quem===q&&x.tipo==="d").forEach(x=>{const g=grupoDe(x.cat);pc[g]=(pc[g]||0)+x.valor;});
+    const gs=Object.entries(pc).sort((a,b)=>b[1]-a[1]);
+    if(gs.length){c.append(el("div","sec2","Gastos por grupo"));gs.forEach(([g,v])=>barra(c,g,v,t.D));}
+    const pp={};itens.filter(x=>x.quem===q&&x.tipo==="d").forEach(x=>{const p=x.pag||"Não informado";pp[p]=(pp[p]||0)+x.valor;});
+    const ps=Object.entries(pp).sort((a,b)=>b[1]-a[1]);
+    if(ps.length){c.append(el("div","sec2","Por forma de pagamento"));ps.forEach(([p,v])=>barra(c,p,v,t.D));}
+    box.append(c);
+  });
+  // sem pessoa (lançamentos antigos "Casa")
+  const sp=itens.filter(x=>!PESSOAS.includes(x.quem));
+  if(sp.length){const c=el("div","card");c.append(el("h2",null,"Sem pessoa definida ("+sp.length+")"),el("p","st","Lançamentos antigos marcados como “Casa”. Toque em Lucas ou Ana para atribuir. Eles entram no total do casal, mas não no saldo individual."));
+    const ul=el("ul","lista");
+    sp.forEach(x=>{const li=el("li"),inf=el("div","inf");inf.append(el("div",null,x.desc+(x.fixa?" (fixa)":"")),el("small",null,x.data.split("-").reverse().join("/")+" · "+brl(x.valor)));
+      li.append(inf);PESSOAS.forEach(q=>{const b=el("button","sm",q);b.type="button";b.style.cssText="padding:6px 10px;margin-left:4px";
+        b.onclick=async()=>{try{await db.collection(x.fixa?"fixas":"lancamentos").doc(x.id).update({quem:q});toast("Atribuído a "+q);}catch(e){toast("Erro ao salvar");}};li.append(b);});
+      ul.append(li);});
+    c.append(ul);box.append(c);}
+}
 function dashboard(m,itens,R,D,porGrupo,porCat,porQuem){
   const fx=itens.filter(x=>x.fixa&&x.tipo==="d").reduce((a,x)=>a+x.valor,0);
   const [y,mo]=m.split("-").map(Number),hoje=new Date(),dias=new Date(y,mo,0).getDate();
@@ -319,8 +366,12 @@ function dashboard(m,itens,R,D,porGrupo,porCat,porQuem){
   ds.forEach(x=>{const li=el("li"),inf=el("div","inf");inf.append(el("div",null,x.desc),el("small",null,x.cat));li.append(inf,el("b","no",brl(x.valor)));tp.append(li);});
   // pessoas
   const pb=$("pessoas");pb.innerHTML="";
-  ["Conjunto","Lucas","Ana"].forEach(q=>{if(porQuem[q])barra(pb,nomeQ(q),porQuem[q],D);});
-  if(!D)pb.append(el("p","st","—"));
+  PESSOAS.forEach(q=>{const t=totaisPessoa(itens,q),li=el("div","bar"),l=el("div","l");
+    l.append(el("span",null,q),el("b",t.R-t.D>=0?"ok":"no",brl(t.R-t.D)));li.append(l,el("small","st",`recebeu ${brl(t.R)} · gastou ${brl(t.D)}`));pb.append(li);});
+  const sp=itens.filter(x=>!PESSOAS.includes(x.quem));if(sp.length)pb.append(el("p","st",`⚠ ${sp.length} lançamento(s) sem pessoa — atribua na aba Pessoas.`));
+  const pg=$("pagsR");if(pg){pg.innerHTML="";const porPag={};itens.filter(x=>x.tipo==="d").forEach(x=>{const p=x.pag||"Não informado";porPag[p]=(porPag[p]||0)+x.valor;});
+    const ps=Object.entries(porPag).sort((a,b)=>b[1]-a[1]);if(!ps.length)pg.append(el("p","st","—"));ps.forEach(([p,v])=>barra(pg,p,v,D));}
+  renderPessoas(m,itens,R,D);
 }
 render();
 
@@ -345,7 +396,7 @@ $("f").onsubmit=async e=>{
   e.preventDefault();if(!ok){alert("Ainda conectando, tente em instantes.");return;}
   const total=num($("valor").value);if(!(total>0)){alert("Valor inválido.");return;}
   const tipo=val("sTipo"),n=tipo==="d"?Number($("parc").value):1;
-  const base={tipo,desc:$("desc").value.trim(),cat:$("cat").value,quem:val("sQuem"),criado:Date.now()};
+  const base={tipo,desc:$("desc").value.trim(),cat:$("cat").value,quem:val("sQuem"),pag:$("pag").value,criado:Date.now()};
   const btn=e.submitter;btn.disabled=true;
   try{
     if(n===1){await db.collection("lancamentos").doc().set({...base,valor:r2(total),data:$("data").value});}
@@ -369,7 +420,7 @@ $("ff").onsubmit=async e=>{
   if(!(v>0)||!(dia>=1&&dia<=31)){alert("Confira valor e dia.");return;}
   try{
     await db.collection("fixas").doc().set({tipo:val("fTipo"),desc:$("fDesc").value.trim(),valor:r2(v),dia,cat:$("fCat").value,
-      quem:val("fQuem"),inicio:ym(ref),fim:null,criado:Date.now()});
+      quem:val("fQuem"),pag:$("fPag").value,inicio:ym(ref),fim:null,criado:Date.now()});
     $("fDesc").value="";$("fValor").value="";$("fDia").value="";
   }catch(err){alert("Não foi possível salvar.");}
 };
