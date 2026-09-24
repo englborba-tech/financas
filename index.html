@@ -88,6 +88,7 @@ input.busca{margin-bottom:8px}
     <div class="card"><h2>Maiores gastos do mês</h2><ul class="lista" id="top"></ul></div>
     <div class="card"><h2>Saldo por pessoa</h2><div id="pessoas"></div></div>
     <div class="card"><h2>Despesas por forma de pagamento</h2><div id="pagsR"></div></div>
+    <div class="card"><h2 id="anoTit">Resumo anual</h2><div id="anoBox"></div></div>
   </section>
 
   <!-- MÊS -->
@@ -301,6 +302,50 @@ $("busca").oninput=e=>{busca=e.target.value.trim();renderHist();};
 const nomeQ=q=>q==="Lucas"||q==="Ana"?q:"Sem pessoa";
 function barra(box,nome,v,tot,extra){const b=el("div","bar"),l=el("div","l");l.append(el("span",null,nome),el("span",null,brl(v)+(extra||"")));
   const t=el("div","t"),i=el("i");i.style.width=(tot?v/tot*100:0).toFixed(1)+"%";t.append(i);b.append(l,t);box.append(b);}
+function renderAnual(ano){
+  const box=$("anoBox");if(!box)return;box.innerHTML="";$("anoTit").textContent="Resumo anual "+ano;
+  const linhas=[];let TR=0,TD=0,acc=0;const tp={Lucas:0,Ana:0};
+  for(let mm=1;mm<=12;mm++){const m=ano+"-"+String(mm).padStart(2,"0"),it=itensDoMes(m);
+    let r=0,d=0;it.forEach(x=>x.tipo==="r"?r+=x.valor:d+=x.valor);
+    const L=totaisPessoa(it,"Lucas"),A=totaisPessoa(it,"Ana");
+    const fut=m>ym(new Date()),tem=it.length>0&&!fut;if(tem){acc+=r-d;TR+=r;TD+=d;tp.Lucas+=L.R-L.D;tp.Ana+=A.R-A.D;}
+    linhas.push({m,mm,r,d,s:r-d,acc:tem?acc:null,l:L.R-L.D,a:A.R-A.D,tem,fut:fut&&it.length>0});}
+  // gráfico de saldo mensal
+  const mx=Math.max(1,...linhas.filter(x=>x.tem||x.fut).map(x=>Math.abs(x.s)));
+  const g=document.createElement("div");g.style.cssText="display:flex;align-items:center;gap:4px;height:150px;margin:4px 0 10px;position:relative";
+  const zero=document.createElement("div");zero.style.cssText="position:absolute;left:0;right:0;top:50%;border-top:1px solid var(--bd)";g.append(zero);
+  linhas.forEach(x=>{const c=document.createElement("div");c.style.cssText="flex:1;height:100%;display:flex;flex-direction:column;position:relative;cursor:pointer";
+    const h=(x.tem||x.fut)?Math.abs(x.s)/mx*48:0,b=document.createElement("i");if(x.fut)b.style.opacity=".35";
+    b.style.cssText=`position:absolute;left:18%;right:18%;border-radius:3px;background:${x.s>=0?"var(--ok)":"var(--no)"};height:${h}%;`+(x.s>=0?`bottom:50%`:`top:50%`);
+    b.title=brl(x.s);c.append(b);
+    const lb=el("small",null,new Date(+ano,x.mm-1,1).toLocaleDateString("pt-BR",{month:"narrow"}).toUpperCase());lb.style.cssText="position:absolute;bottom:-2px;left:0;right:0;text-align:center;font-size:.7rem;color:"+(x.m===ym(ref)?"var(--ac)":"var(--mut)")+";font-weight:"+(x.m===ym(ref)?"700":"400");
+    c.append(lb);c.onclick=()=>{const [y,mo]=x.m.split("-").map(Number);ref=new Date(y,mo-1,1);render();window.scrollTo(0,0);};g.append(c);});
+  box.append(g);
+  // KPIs do ano
+  const k=el("div","kpi");k.style.marginBottom="10px";
+  [["Receitas no ano",brl(TR),"ok"],["Despesas no ano",brl(TD),"no"],["Saldo do ano",brl(TR-TD),TR-TD>=0?"ok":"no"],["Média mensal",brl((TR-TD)/Math.max(1,linhas.filter(x=>x.tem).length)),""],
+   ["Saldo Lucas no ano",brl(tp.Lucas),tp.Lucas>=0?"ok":"no"],["Saldo Ana no ano",brl(tp.Ana),tp.Ana>=0?"ok":"no"]]
+   .forEach(([a,b,c])=>{const d=el("div");d.append(el("small",null,a),el("b",c,b));k.append(d);});box.append(k);
+  // tabela
+  const w=document.createElement("div");w.style.cssText="overflow-x:auto";
+  const t=document.createElement("table");t.style.cssText="width:100%;border-collapse:collapse;font-size:.85rem;min-width:560px";
+  const th=(x,al)=>{const e=el("th",null,x);e.style.cssText=`text-align:${al||"right"};padding:6px 4px;color:var(--mut);font-size:.75rem;border-bottom:1px solid var(--bd)`;return e;};
+  const td=(x,cl,al)=>{const e=el("td",cl,x);e.style.cssText=`text-align:${al||"right"};padding:7px 4px;border-bottom:1px solid var(--bd);white-space:nowrap`;return e;};
+  const hr=el("tr");[["Mês","left"],["Receitas"],["Despesas"],["Saldo"],["Acumulado"],["Lucas"],["Ana"]].forEach(([x,a])=>hr.append(th(x,a)));
+  const thd=el("thead");thd.append(hr);t.append(thd);const tb=el("tbody");
+  const cor=v=>v>=0?"ok":"no";
+  linhas.forEach(x=>{const tr=el("tr");tr.style.cursor="pointer";if(x.m===ym(ref))tr.style.background="var(--bg)";
+    tr.onclick=()=>{const [y,mo]=x.m.split("-").map(Number);ref=new Date(y,mo-1,1);render();window.scrollTo(0,0);};
+    const nm=new Date(+ano,x.mm-1,1).toLocaleDateString("pt-BR",{month:"short"}).replace(".","");
+    if(x.fut){tr.append(td(nm+" (previsto)",null,"left"),td(brl(x.r)),td(brl(x.d)),td(brl(x.s)),td("—"),td(brl(x.l)),td(brl(x.a)));tr.style.color="var(--mut)";tr.style.fontStyle="italic";}
+    else if(!x.tem){tr.append(td(nm,null,"left"),...Array(6).fill(0).map(()=>td("—")));tr.style.color="var(--mut)";}
+    else tr.append(td(nm,null,"left"),td(brl(x.r)),td(brl(x.d)),td(brl(x.s),cor(x.s)),td(brl(x.acc),cor(x.acc)),td(brl(x.l),cor(x.l)),td(brl(x.a),cor(x.a)));
+    tb.append(tr);});
+  const tot=el("tr");tot.style.fontWeight="700";
+  tot.append(td("Total",null,"left"),td(brl(TR)),td(brl(TD)),td(brl(TR-TD),cor(TR-TD)),td(""),td(brl(tp.Lucas),cor(tp.Lucas)),td(brl(tp.Ana),cor(tp.Ana)));tb.append(tot);
+  t.append(tb);w.append(t);box.append(w);
+  box.append(el("p","st","Toque em um mês para abri-lo. Meses futuros aparecem em cinza como previsão (contas fixas e parcelas já lançadas) e não entram nos totais do ano."));
+}
 function totaisPessoa(itens,q){let R=0,D=0;itens.forEach(x=>{if(x.quem!==q)return;x.tipo==="r"?R+=x.valor:D+=x.valor;});return{R,D};}
 function renderPessoas(m,itens,R,D){
   const box=$("pesBox");if(!box)return;box.innerHTML="";
@@ -372,6 +417,7 @@ function dashboard(m,itens,R,D,porGrupo,porCat,porQuem){
   const pg=$("pagsR");if(pg){pg.innerHTML="";const porPag={};itens.filter(x=>x.tipo==="d").forEach(x=>{const p=x.pag||"Não informado";porPag[p]=(porPag[p]||0)+x.valor;});
     const ps=Object.entries(porPag).sort((a,b)=>b[1]-a[1]);if(!ps.length)pg.append(el("p","st","—"));ps.forEach(([p,v])=>barra(pg,p,v,D));}
   renderPessoas(m,itens,R,D);
+  renderAnual(m.slice(0,4));
 }
 render();
 
