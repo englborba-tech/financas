@@ -174,6 +174,8 @@ const GRUPOS={
  "Financeiro":["Impostos/Taxas","Tarifas bancárias","Poupança/Investimento"],
  "Outros":["Outros"]};
 const RECEITAS=["Salário","Pró-labore/Serviços","Rendimentos","Outras receitas"];
+// gravação sem esperar o servidor (funciona offline: a escrita fica na fila e sobe quando a internet voltar)
+const gravar=p=>{p.catch(e=>toast("Erro ao salvar"+(e&&e.code?" ("+e.code+")":"")));};
 const PAGS=["Pix","Cartão de crédito","Cartão de débito","Dinheiro","Transferência (TED/DOC)","Boleto","Débito automático","Vale-alimentação/refeição","Outro"];
 const PESSOAS=["Lucas","Ana"];
 const grupoDe=c=>{for(const g in GRUPOS)if(GRUPOS[g].includes(c))return g;return "Outros";};
@@ -245,8 +247,8 @@ function render(){
     inf.append(el("div",null,f.desc),el("small",null,"Todo dia "+f.dia+" · "+f.cat+" · "+nomeQ(f.quem)+(f.pag?" · "+f.pag:"")+" · desde "+f.inicio.split("-").reverse().join("/")));
     const del=el("button","del","Encerrar");del.onclick=async()=>{
       if(!await ask(`Encerrar "${f.desc}"? Ela deixa de aparecer a partir de ${ref.toLocaleDateString("pt-BR",{month:"long",year:"numeric"})}; os meses anteriores ficam.`,[["Encerrar",true,"dan"],["Cancelar",false]]))return;
-      try{ if(addMes(m,-1)<f.inicio)await db.collection("fixas").doc(f.id).delete();
-           else await db.collection("fixas").doc(f.id).update({fim:addMes(m,-1)}); }catch(e){alert("Erro ao encerrar.");}
+      if(addMes(m,-1)<f.inicio)gravar(db.collection("fixas").doc(f.id).delete());
+      else gravar(db.collection("fixas").doc(f.id).update({fim:addMes(m,-1)}));
     };
     li.append(inf,el("b",f.tipo==="r"?"ok":"no",brl(f.valor)),del);uf.append(li);
   });
@@ -378,7 +380,7 @@ function renderPessoas(m,itens,R,D){
     const ul=el("ul","lista");
     sp.forEach(x=>{const li=el("li"),inf=el("div","inf");inf.append(el("div",null,x.desc+(x.fixa?" (fixa)":"")),el("small",null,x.data.split("-").reverse().join("/")+" · "+brl(x.valor)));
       li.append(inf);PESSOAS.forEach(q=>{const b=el("button","sm",q);b.type="button";b.style.cssText="padding:6px 10px;margin-left:4px";
-        b.onclick=async()=>{try{await db.collection(x.fixa?"fixas":"lancamentos").doc(x.id).update({quem:q});toast("Atribuído a "+q);}catch(e){toast("Erro ao salvar");}};li.append(b);});
+        b.onclick=()=>{gravar(db.collection(x.fixa?"fixas":"lancamentos").doc(x.id).update({quem:q}));toast("Atribuído a "+q);};li.append(b);});
       ul.append(li);});
     c.append(ul);box.append(c);}
 }
@@ -428,14 +430,14 @@ async function excluir(x){
     const r=await ask(`"${x.desc}" está parcelado em ${x.parcela.total}x. O que excluir?`,[["Só esta parcela ("+x.parcela.n+"/"+x.parcela.total+")","uma","dan"],["Todas as "+grupo.length+" parcelas","todas","dan"],["Cancelar",null]]);
     if(!r)return; if(r==="todas")alvo=grupo;
   }else if(!await ask(`Excluir "${x.desc}" (${brl(x.valor)})?`,[["Excluir",true,"dan"],["Cancelar",false]]))return;
-  try{for(const y of alvo)await db.collection("lancamentos").doc(y.id).delete();toast("Excluído");}catch(e){toast("Erro ao excluir.");}
+  alvo.forEach(y=>gravar(db.collection("lancamentos").doc(y.id).delete()));toast("Excluído");
 }
 
 async function salvarMeta(c,v){
   const n=v.trim()?num(v):0;
   if(v.trim()&&!(n>0)){alert("Valor inválido.");render();return;}
   const novo={...metas};if(n)novo[c]=r2(n);else delete novo[c];
-  try{await db.doc("config/metas").set(novo);}catch(e){alert("Erro ao salvar meta.");}
+  gravar(db.doc("config/metas").set(novo));
 }
 
 $("f").onsubmit=async e=>{
@@ -445,14 +447,14 @@ $("f").onsubmit=async e=>{
   const base={tipo,desc:$("desc").value.trim(),cat:$("cat").value,quem:val("sQuem"),pag:$("pag").value,criado:Date.now()};
   const btn=e.submitter;btn.disabled=true;
   try{
-    if(n===1){await db.collection("lancamentos").doc().set({...base,valor:r2(total),data:$("data").value});}
+    if(n===1){gravar(db.collection("lancamentos").doc().set({...base,valor:r2(total),data:$("data").value}));}
     else{
       const grupo="p"+Date.now().toString(36),parc=Math.floor(total/n*100)/100,ultima=r2(total-parc*(n-1));
       const [y,mo,d]=$("data").value.split("-").map(Number);
       for(let i=0;i<n;i++){
         const dt=new Date(y,mo-1+i,1),ult=new Date(dt.getFullYear(),dt.getMonth()+1,0).getDate();
         const data=ym(dt)+"-"+String(Math.min(d,ult)).padStart(2,"0");
-        await db.collection("lancamentos").doc().set({...base,valor:i===n-1?ultima:parc,data,parcela:{n:i+1,total:n,grupo}});
+        gravar(db.collection("lancamentos").doc().set({...base,valor:i===n-1?ultima:parc,data,parcela:{n:i+1,total:n,grupo}}));
       }
     }
     $("desc").value="";$("valor").value="";$("parc").value="1";
@@ -465,8 +467,8 @@ $("ff").onsubmit=async e=>{
   const v=num($("fValor").value),dia=Number($("fDia").value);
   if(!(v>0)||!(dia>=1&&dia<=31)){alert("Confira valor e dia.");return;}
   try{
-    await db.collection("fixas").doc().set({tipo:val("fTipo"),desc:$("fDesc").value.trim(),valor:r2(v),dia,cat:$("fCat").value,
-      quem:val("fQuem"),pag:$("fPag").value,inicio:ym(ref),fim:null,criado:Date.now()});
+    gravar(db.collection("fixas").doc().set({tipo:val("fTipo"),desc:$("fDesc").value.trim(),valor:r2(v),dia,cat:$("fCat").value,
+      quem:val("fQuem"),pag:$("fPag").value,inicio:ym(ref),fim:null,criado:Date.now()}));
     $("fDesc").value="";$("fValor").value="";$("fDia").value="";
   }catch(err){alert("Não foi possível salvar.");}
 };
@@ -497,7 +499,9 @@ auth.onAuthStateChanged(u=>{
   $("login").style.display=u?"none":"flex";
   if(!u)return;
   $("st").textContent="Conectando…";
-  let n=0;const pronto=()=>{if(++n>=3){ok=true;$("st").textContent="✓ Sincronizado · "+u.email;}};
+  let n=0;const pronto=()=>{if(++n>=3){ok=true;atualizaSt();}};
+  const atualizaSt=()=>{$("st").textContent=(navigator.onLine?"✓ Sincronizado · ":"📴 Offline — os lançamentos sobem quando a internet voltar · ")+u.email;};
+  window.addEventListener("online",atualizaSt);window.addEventListener("offline",atualizaSt);
   const erro=e=>{$("st").textContent=e.code==="permission-denied"?"Este e-mail ("+u.email+") não tem acesso. Toque em Sair e use outro.":"Erro de sincronização ("+e.code+").";};
   let a=false,b=false,c=false;
   subs.push(db.collection("lancamentos").onSnapshot(s=>{lanc=s.docs.map(d=>({id:d.id,...d.data()}));if(!a){a=true;pronto();}render();},erro));
