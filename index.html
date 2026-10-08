@@ -74,7 +74,7 @@ input.busca{margin-bottom:8px}
 </head>
 <body>
 <div class="wrap">
-  <div style="display:flex;justify-content:space-between;align-items:center"><h1>💰 Finanças da Casa</h1><button id="sair" type="button" style="padding:6px 10px;font-size:.85rem">Sair</button></div>
+  <div style="display:flex;justify-content:space-between;align-items:center"><h1>💰 Finanças da Casa</h1><span><button id="importar" type="button" style="padding:6px 10px;font-size:.85rem">Importar</button> <button id="sair" type="button" style="padding:6px 10px;font-size:.85rem">Sair</button></span></div>
   <div class="card mes">
     <button id="ant" aria-label="Mês anterior">‹</button><b id="mesTxt"></b><button id="prox" aria-label="Próximo mês">›</button>
   </div>
@@ -169,13 +169,29 @@ const GRUPOS={
  "Carro e transporte":["Combustível","Manutenção do carro","Seguro do carro","IPVA/Licenciamento","Estacionamento/Pedágio","Uber/App"],
  "Gatas":["Ração e areia","Veterinário","Petshop/Outros"],
  "Saúde":["Plano de saúde","Farmácia","Consultas/Exames","Academia"],
- "Pessoal":["Roupas/Calçados","Beleza/Cuidados","Educação/Cursos"],
+ "Pessoal":["Roupas/Calçados","Beleza/Cuidados","Educação/Cursos","Compras diversas"],
  "Lazer":["Viagens","Passeios/Cinema","Assinaturas/Streaming","Presentes"],
  "Financeiro":["Impostos/Taxas","Tarifas bancárias","Poupança/Investimento"],
  "Outros":["Outros"]};
 const RECEITAS=["Salário","Pró-labore/Serviços","Rendimentos","Outras receitas"];
 // gravação sem esperar o servidor (funciona offline: a escrita fica na fila e sobe quando a internet voltar)
 const gravar=p=>{p.catch(e=>toast("Erro ao salvar"+(e&&e.code?" ("+e.code+")":"")));};
+// importação de lançamentos (arquivo .json) — só adiciona; ignora os que já existem
+function importarLanc(){if(!ok){toast("Aguarde conectar");return;}const inp=document.createElement("input");inp.type="file";inp.accept=".json,application/json";
+  inp.onchange=async()=>{const f=inp.files[0];if(!f)return;let L=[],F=[];try{const j=JSON.parse(await f.text());L=Array.isArray(j)?j:(j.lancamentos||[]);F=j.fixas||[];if(!Array.isArray(L)||!Array.isArray(F))throw 0;}catch(e){toast("Arquivo inválido");return;}
+    const chave=x=>[x.data,x.tipo,(+x.valor).toFixed(2),(x.desc||"").trim().toLowerCase(),x.quem].join("|");
+    const chaveF=x=>[x.tipo,(+x.valor).toFixed(2),(x.desc||"").trim().toLowerCase(),x.quem,x.inicio].join("|");
+    const ex=new Set(lanc.map(chave)),exF=new Set(fixas.map(chaveF));
+    const nL=L.filter(x=>x&&x.data&&+x.valor>0&&!ex.has(chave(x))),nF=F.filter(x=>x&&x.inicio&&+x.valor>0&&!exF.has(chaveF(x)));
+    const ign=(L.length-nL.length)+(F.length-nF.length);
+    if(!nL.length&&!nF.length){toast("Nada novo para importar — tudo já está lançado");return;}
+    const D=nL.filter(x=>x.tipo!=="r").reduce((a,x)=>a+(+x.valor),0),R=nL.filter(x=>x.tipo==="r").reduce((a,x)=>a+(+x.valor),0);
+    const msg=(nL.length?`${nL.length} lançamento(s) — despesas ${brl(D)}, receitas ${brl(R)}. `:"")+(nF.length?`${nF.length} conta(s) fixa(s). `:"")+(ign?`${ign} já existiam e serão ignorados.`:"");
+    if(!await ask("Adicionar? "+msg,[["Adicionar",true,"pri"],["Cancelar",false]]))return;const t=Date.now();
+    nL.forEach((x,i)=>gravar(db.collection("lancamentos").doc().set({tipo:x.tipo==="r"?"r":"d",desc:String(x.desc||"").trim()||x.cat,valor:Math.round(+x.valor*100)/100,data:x.data,cat:x.cat,quem:x.quem==="Lucas"?"Lucas":"Ana",pag:x.pag||"",criado:t+i})));
+    nF.forEach((x,i)=>gravar(db.collection("fixas").doc().set({tipo:x.tipo==="r"?"r":"d",desc:String(x.desc||"").trim()||x.cat,valor:Math.round(+x.valor*100)/100,dia:Math.max(1,Math.min(31,+x.dia||1)),cat:x.cat,quem:x.quem==="Lucas"?"Lucas":"Ana",pag:x.pag||"",inicio:x.inicio,fim:x.fim||null,criado:t+1000+i})));
+    toast((nL.length?nL.length+" lançamentos":"")+(nL.length&&nF.length?" e ":"")+(nF.length?nF.length+" contas fixas":"")+" adicionados");};
+  inp.click();}
 const PAGS=["Pix","Cartão de crédito","Cartão de débito","Dinheiro","Transferência (TED/DOC)","Boleto","Débito automático","Vale-alimentação/refeição","Outro"];
 const PESSOAS=["Lucas","Ana"];
 const grupoDe=c=>{for(const g in GRUPOS)if(GRUPOS[g].includes(c))return g;return "Outros";};
@@ -493,6 +509,7 @@ $("entrar").onclick=async()=>{
   const p=new firebase.auth.GoogleAuthProvider();p.setCustomParameters({prompt:"select_account"});
   try{await auth.signInWithPopup(p);}catch(e){if(e.code==="auth/popup-blocked"||e.code==="auth/operation-not-supported-in-this-environment")auth.signInWithRedirect(p);else toast("Não foi possível entrar ("+e.code+")");}
 };
+$("importar").onclick=importarLanc;
 $("sair").onclick=async()=>{if(await ask("Sair da conta neste aparelho?",[["Sair",true,"dan"],["Cancelar",false]]))auth.signOut();};
 auth.onAuthStateChanged(u=>{
   subs.forEach(f=>f());subs=[];ok=false;
